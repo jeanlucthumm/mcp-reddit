@@ -342,7 +342,7 @@ async def get_trending_subreddits(limit: int = 10) -> str:
     try:
         trending_subs = []
         logger.debug(f"Fetching trending subreddits with limit {limit}")
-        async for subreddit in client.p.subreddit.pull.trending(limit=limit):
+        async for subreddit in client.p.subreddit.pull.popular(limit=limit):
             logger.debug(f"Found trending subreddit: r/{subreddit.display_name}")
             trending_subs.append(subreddit.display_name)
 
