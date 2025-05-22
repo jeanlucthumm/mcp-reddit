@@ -343,8 +343,8 @@ async def get_trending_subreddits(limit: int = 10) -> str:
         trending_subs = []
         logger.debug(f"Fetching trending subreddits with limit {limit}")
         async for subreddit in client.p.subreddit.pulls.popular(amount=limit):
-            logger.debug(f"Found trending subreddit: r/{subreddit.display_name}")
-            trending_subs.append(subreddit.display_name)
+            logger.debug(f"Found trending subreddit: r/{subreddit.name}")
+            trending_subs.append(subreddit.name)
 
         if not trending_subs:
             logger.info("No trending subreddits found")
