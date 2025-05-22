@@ -207,13 +207,13 @@ async def search_posts(query: str, subreddit: Optional[str] = None, sort: str = 
         return f"An error occurred: {str(e)}"
 
 @mcp.tool()
-async def search_subreddit(subreddit: str, query: str, sort: str = "hot", time_filter: str = "week", limit: int = 25) -> str:
+async def search_subreddit(subreddit: str, query: str = "", sort: str = "hot", time_filter: str = "week", limit: int = 25) -> str:
     """
-    Search within specific subreddits.
+    Search within specific subreddits or get recent posts.
 
     Args:
         subreddit: The name of the subreddit to search within.
-        query: The search query string.
+        query: The search query string. If empty, returns recent posts based on sort method.
         sort: How to sort the results (e.g., "hot", "top", "new", "relevance").
         time_filter: Filter results by time (e.g., "hour", "day", "week", "month", "year", "all").
         limit: Number of posts to fetch (default: 25).
@@ -224,26 +224,122 @@ async def search_subreddit(subreddit: str, query: str, sort: str = "hot", time_f
     logger.info(f"search_subreddit called with subreddit='{subreddit}', query='{query}', sort='{sort}', time_filter='{time_filter}', limit={limit}")
     try:
         posts = []
-        search_params = {
-            'q': query,
-            'sort': sort,
-            't': time_filter,
-            'limit': limit
-        }
+        
+        # If query is empty, use pull methods instead of search
+        if not query.strip():
+            logger.debug(f"Empty query provided, using pull method for r/{subreddit} with sort='{sort}'")
+            
+            if sort == "hot":
+                async for submission in client.p.subreddit.pull.hot(subreddit, amount=limit):
+                    logger.debug(f"Processing hot post: {submission.id} - {submission.title[:50]}")
+                    post_info = (
+                        f"Title: {submission.title}\n"
+                        f"Score: {submission.score}\n"
+                        f"Comments: {submission.comment_count}\n"
+                        f"Author: {submission.author_display_name or '[deleted]'}\n"
+                        f"Type: {_get_post_type(submission)}\n"
+                        f"Content: {_get_content(submission)}\n"
+                        f"Link: https://reddit.com{submission.permalink}\n"
+                        f"---"
+                    )
+                    posts.append(post_info)
+            elif sort == "new":
+                async for submission in client.p.subreddit.pull.new(subreddit, amount=limit):
+                    logger.debug(f"Processing new post: {submission.id} - {submission.title[:50]}")
+                    post_info = (
+                        f"Title: {submission.title}\n"
+                        f"Score: {submission.score}\n"
+                        f"Comments: {submission.comment_count}\n"
+                        f"Author: {submission.author_display_name or '[deleted]'}\n"
+                        f"Type: {_get_post_type(submission)}\n"
+                        f"Content: {_get_content(submission)}\n"
+                        f"Link: https://reddit.com{submission.permalink}\n"
+                        f"---"
+                    )
+                    posts.append(post_info)
+            elif sort == "top":
+                async for submission in client.p.subreddit.pull.top(subreddit, amount=limit, time=time_filter):
+                    logger.debug(f"Processing top post: {submission.id} - {submission.title[:50]}")
+                    post_info = (
+                        f"Title: {submission.title}\n"
+                        f"Score: {submission.score}\n"
+                        f"Comments: {submission.comment_count}\n"
+                        f"Author: {submission.author_display_name or '[deleted]'}\n"
+                        f"Type: {_get_post_type(submission)}\n"
+                        f"Content: {_get_content(submission)}\n"
+                        f"Link: https://reddit.com{submission.permalink}\n"
+                        f"---"
+                    )
+                    posts.append(post_info)
+            else:
+                # Default to hot for other sort types when no query
+                logger.debug(f"Unknown sort '{sort}' with empty query, defaulting to hot")
+                async for submission in client.p.subreddit.pull.hot(subreddit, amount=limit):
+                    logger.debug(f"Processing hot post (default): {submission.id} - {submission.title[:50]}")
+                    post_info = (
+                        f"Title: {submission.title}\n"
+                        f"Score: {submission.score}\n"
+                        f"Comments: {submission.comment_count}\n"
+                        f"Author: {submission.author_display_name or '[deleted]'}\n"
+                        f"Type: {_get_post_type(submission)}\n"
+                        f"Content: {_get_content(submission)}\n"
+                        f"Link: https://reddit.com{submission.permalink}\n"
+                        f"---"
+                    )
+                    posts.append(post_info)
+                    
+            if not posts:
+                logger.info(f"No posts found in r/{subreddit}")
+                return f"No posts found in r/{subreddit}."
+            logger.info(f"Successfully found {len(posts)} posts in r/{subreddit} using pull method")
+            return "\n\n".join(posts)
+        
+        else:
+            # Use search API when query is provided
+            logger.debug(f"Query provided, using search method for r/{subreddit}")
+            async for submission in client.p.submission.search(subreddit, query, amount=limit, sort=sort, time=time_filter):
+                logger.debug(f"Processing subreddit search result: {submission.id} - {submission.title[:50]}")
+                post_info = (
+                    f"Title: {submission.title}\n"
+                    f"Score: {submission.score}\n"
+                    f"Comments: {submission.comment_count}\n"
+                    f"Author: {submission.author_display_name or '[deleted]'}\n"
+                    f"Type: {_get_post_type(submission)}\n"
+                    f"Content: {_get_content(submission)}\n"
+                    f"Link: https://reddit.com{submission.permalink}\n"
+                    f"---"
+                )
+                posts.append(post_info)
 
-        search_params['subreddit'] = subreddit
-        logger.debug(f"Search parameters for subreddit search: {search_params}")
-        logger.debug(f"Calling client.p.submission.search() for subreddit r/{subreddit}")
-        
-        # Use correct redditwarp API: client.p.submission.search(subreddit, query, **params)
-        sr = search_params.pop('subreddit')
-        query = search_params.pop('q')
-        sort = search_params.pop('sort', 'hot')
-        time_filter = search_params.pop('t', 'week')
-        limit = search_params.pop('limit', 25)
-        
-        async for submission in client.p.submission.search(sr, query, amount=limit, sort=sort, time=time_filter):
-            logger.debug(f"Processing subreddit search result: {submission.id} - {submission.title[:50]}")
+            if not posts:
+                logger.info(f"No posts found in r/{subreddit} for query: '{query}'")
+                return f"No posts found in r/{subreddit} matching your criteria."
+            
+            logger.info(f"Successfully found {len(posts)} posts in r/{subreddit} for query: '{query}'")
+            return "\n\n".join(posts)
+
+    except Exception as e:
+        logger.error(f"Error in search_subreddit for subreddit '{subreddit}' and query '{query}': {str(e)}", exc_info=True)
+        return f"An error occurred: {str(e)}"
+
+@mcp.tool()
+async def fetch_reddit_new_threads(subreddit: str, limit: int = 10) -> str:
+    """
+    Fetch new/recent threads from a subreddit
+    
+    Args:
+        subreddit: Name of the subreddit
+        limit: Number of posts to fetch (default: 10)
+    
+    Returns:
+        Human readable string containing list of recent post information
+    """
+    logger.info(f"fetch_reddit_new_threads called with subreddit='{subreddit}', limit={limit}")
+    try:
+        posts = []
+        logger.debug(f"Starting to fetch new posts from r/{subreddit}")
+        async for submission in client.p.subreddit.pull.new(subreddit, limit):
+            logger.debug(f"Processing new submission: {submission.id} - {submission.title[:50]}")
             post_info = (
                 f"Title: {submission.title}\n"
                 f"Score: {submission.score}\n"
@@ -256,15 +352,11 @@ async def search_subreddit(subreddit: str, query: str, sort: str = "hot", time_f
             )
             posts.append(post_info)
 
-        if not posts:
-            logger.info(f"No posts found in r/{subreddit} for query: '{query}'")
-            return f"No posts found in r/{subreddit} matching your criteria."
-        
-        logger.info(f"Successfully found {len(posts)} posts in r/{subreddit} for query: '{query}'")
+        logger.info(f"Successfully fetched {len(posts)} new posts from r/{subreddit}")
         return "\n\n".join(posts)
 
     except Exception as e:
-        logger.error(f"Error in search_subreddit for subreddit '{subreddit}' and query '{query}': {str(e)}", exc_info=True)
+        logger.error(f"Error in fetch_reddit_new_threads: {str(e)}", exc_info=True)
         return f"An error occurred: {str(e)}"
 
 @mcp.tool()
