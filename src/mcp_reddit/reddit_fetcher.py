@@ -194,7 +194,8 @@ async def search_subreddit(subreddit: str, query: str, sort: str = "hot", time_f
             'limit': limit
         }
 
-        async for submission in client.p.subreddit.search(subreddit, **search_params):
+        search_params['subreddit'] = subreddit
+        async for submission in client.p.search(**search_params):
             post_info = (
                 f"Title: {submission.title}\n"
                 f"Score: {submission.score}\n"
