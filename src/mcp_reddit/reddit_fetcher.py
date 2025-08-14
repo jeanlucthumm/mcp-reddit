@@ -510,3 +510,7 @@ async def search_multiple_subreddits(subreddits: list[str], query: str, sort: st
     except Exception as e:
         logger.error(f"Error in search_multiple_subreddits for subreddits {subreddits} and query '{query}': {str(e)}", exc_info=True)
         return f"An error occurred: {str(e)}"
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(mcp.run())
