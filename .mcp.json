@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mcp-reddit": {
+      "command": "uvx",
+      "args": ["--from", ".", "mcp-reddit"],
+      "env": {
+        "REDDIT_CLIENT_ID": "${REDDIT_CLIENT_ID}",
+        "REDDIT_CLIENT_SECRET": "${REDDIT_CLIENT_SECRET}"
+      }
+    }
+  }
+}
